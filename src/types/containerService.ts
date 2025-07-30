@@ -11,3 +11,10 @@ export async function fetchContainer(containerNumber: string): Promise<Container
     return null;
   }
 }
+
+export async function fetchAllContainers(): Promise<ContainerResponse[]> {
+  const res = await fetch("/api/containers");
+  if (!res.ok) throw new Error("Failed to fetch container list");
+  const data: ContainerResponse[] = await res.json();
+  return data;
+}
