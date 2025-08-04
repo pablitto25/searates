@@ -14,7 +14,7 @@ delete (L.Icon.Default.prototype as any)._getIconUrl;
 const customIcon = new L.Icon({
     iconUrl: "/assets/leaflet/location.png",
     iconRetinaUrl: "/assets/leaflet/location.png",
-    iconSize: [32, 32],
+    iconSize: [20, 20],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
     shadowUrl: "",
@@ -23,31 +23,6 @@ const customIcon = new L.Icon({
 });
 
 export default function Map() {
-
-    //single container
-    const [containerNumber, setContainerNumber] = useState("");
-    const [containerData, setContainerData] = useState<ContainerResponse | null>(null);
-
-    const handleSearch = async () => {
-        const data = await fetchContainer(containerNumber.trim());
-        if (data) {
-            setContainerData(data);
-        }
-    };
-
-    const getPolylineFromRoute = (): LatLngTuple[][] => {
-        if (!containerData) return [];
-        return containerData.route_data.route_info.map(route =>
-            route.pathObjects.map(point => [point.lat, point.lng] as LatLngTuple)
-        );
-    };
-
-    const getPin = (): LatLngTuple | null => {
-        if (!containerData) return null;
-        return [containerData.route_data.pin.lat, containerData.route_data.pin.lng];
-    };
-
-    const center = getPin() ?? [0, 0];
 
     //all containers
     const [allContainers, setAllContainers] = useState<ContainerResponse[] | null>(null);
@@ -111,57 +86,58 @@ export default function Map() {
             }));
     };
 
+    //marks icons start - end
+    const startIcon = new L.Icon({
+        iconUrl: "/assets/leaflet/start.png", // ← poné tu ícono de banderita de inicio
+        iconSize: [20, 20],
+        iconAnchor: [16, 32],
+    });
+
+    const endIcon = new L.Icon({
+        iconUrl: "/assets/leaflet/end.png", // ← poné tu ícono de llegada
+        iconSize: [16, 16],
+        iconAnchor: [16, 32],
+    });
+
     return (
         <div className="w-full h-[900px] flex flex-col gap-4">
-            {/* <div className="flex gap-2">
-                <input
-                    className="text-black border-2 border-solid px-2 py-1"
-                    type="text"
-                    name="search"
-                    placeholder="Container Number"
-                    value={containerNumber}
-                    onChange={(e) => setContainerNumber(e.target.value)}
-                />
-                <Button className="text-black border-2 border-solid" onClick={handleSearch}>Buscar</Button>
-            </div> */}
-
             <div className="flex-grow">
                 <MapContainer
-                    center={center}
+                    center={[0, 0]}
                     zoom={3}
                     scrollWheelZoom={true}
                     style={{ height: "100%", width: "100%" }}
                 >
                     <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+                        attribution='</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-
-                    {/* Dibujar las rutas si existen */}
-                    {getPolylineFromRoute().map((line, i) => (
-                        <Polyline key={i} positions={line} pathOptions={{ color: "red", weight: 2 }} />
-                    ))}
-                    {/* Polylines de la lista */}
                     {getPolylinesFromSelected().map((line, i) => (
-                        <Polyline key={`selected-${i}`} positions={line} pathOptions={{ color: "blue", weight: 2 }} />
+                        <>
+                            <Polyline key={`selected-line-${i}`} positions={line} pathOptions={{ color: "blue", weight: 2 }} />
+
+                            {/* Punto de inicio */}
+                            <Marker key={`start-${i}`} position={line[0]} icon={startIcon}>
+                                <Popup>Inicio de ruta 🏁</Popup>
+                            </Marker>
+
+                            {/* Punto de fin */}
+                            <Marker key={`end-${i}`} position={line[line.length - 1]} icon={endIcon}>
+                                <Popup>Fin de ruta 🎯</Popup>
+                            </Marker>
+                        </>
                     ))}
 
-                    {/* Pin actual */}
-                    {getPin() && (
-                        <Marker position={getPin()!} icon={customIcon}>
-                            <Popup>Posición actual 📦</Popup>
-                        </Marker>
-                    )}
                     {/* Pin de la Lista */}
                     {getSelectedPins().map(({ id, pin }) => (
                         <Marker key={`pin-${id}`} position={pin} icon={customIcon}>
-                            <Popup>Contenedor #{id}</Popup>
+                            <Popup>Posición actual 📦 #{id}</Popup>
                         </Marker>
                     ))}
                 </MapContainer>
             </div>
             <div>
-                <div className="">
+                <div className="container flex-col m-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-bold text-black">Lista de Contenedores</h2>
                         <Button onClick={loadAllContainers} className="text-black">Actualizar</Button>
@@ -174,8 +150,7 @@ export default function Map() {
                             <thead className="bg-gray-800">
                                 <tr>
                                     <th className="p-2 border">Ver Ruta</th>
-                                    <th className="p-2 border">Number</th>
-                                    <th className="p-2 border">Sealine</th>
+                                    <th className="p-2 border">N. Contenedor</th>
                                     <th className="p-2 border">Status</th>
                                     <th className="p-2 border">Updated At</th>
                                     <th className="p-2 border">Type</th>
@@ -197,7 +172,6 @@ export default function Map() {
                                                 />
                                             </td>
                                             <td className="p-2 border text-black">{container.metadata.number}</td>
-                                            <td className="p-2 border text-black">{container.metadata.sealine_name}</td>
                                             <td className="p-2 border text-black">{container.metadata.status}</td>
                                             <td className="p-2 border text-black">{container.metadata.updated_at}</td>
                                             <td className="p-2 border text-black">{info?.type || "-"}</td>
