@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -112,21 +112,28 @@ export default function Map() {
                         attribution='</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {getPolylinesFromSelected().map((line, i) => (
-                        <>
-                            <Polyline key={`selected-line-${i}`} positions={line} pathOptions={{ color: "blue", weight: 2 }} />
+                    {getPolylinesFromSelected().map((line, i) => {
+                        if (!line || line.length < 2) return null;
 
-                            {/* Punto de inicio */}
-                            <Marker key={`start-${i}`} position={line[0]} icon={startIcon}>
-                                <Popup>Inicio de ruta 🏁</Popup>
-                            </Marker>
+                        const start = line[0];
+                        const end = line[line.length - 1];
 
-                            {/* Punto de fin */}
-                            <Marker key={`end-${i}`} position={line[line.length - 1]} icon={endIcon}>
-                                <Popup>Fin de ruta 🎯</Popup>
-                            </Marker>
-                        </>
-                    ))}
+                        return (
+                            <React.Fragment key={`selected-${i}`}>
+                                <Polyline positions={line} pathOptions={{ color: "blue", weight: 2 }} />
+
+                                {/* Punto de inicio */}
+                                <Marker position={start} icon={startIcon}>
+                                    <Popup>Inicio de ruta 🏁</Popup>
+                                </Marker>
+
+                                {/* Punto de fin */}
+                                <Marker position={end} icon={endIcon}>
+                                    <Popup>Fin de ruta 🎯</Popup>
+                                </Marker>
+                            </React.Fragment>
+                        );
+                    })}
 
                     {/* Pin de la Lista */}
                     {getSelectedPins().map(({ id, pin }) => (
@@ -151,12 +158,13 @@ export default function Map() {
                                 <tr>
                                     <th className="p-2 border">Ver Ruta</th>
                                     <th className="p-2 border">N. Contenedor</th>
+                                    <th className="p-2 border">N. Orden</th>
+                                    <th className="p-2 border">Detalle</th>
                                     <th className="p-2 border">Status</th>
                                     <th className="p-2 border">Updated At</th>
                                     <th className="p-2 border">Type</th>
                                     <th className="p-2 border">Transport</th>
-                                    <th className="p-2 border">From</th>
-                                    <th className="p-2 border">To</th>
+                                    <th className="p-2 border">Nombre de Empresa</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -172,12 +180,14 @@ export default function Map() {
                                                 />
                                             </td>
                                             <td className="p-2 border text-black">{container.metadata.number}</td>
+                                            <td className="p-2 border text-black">{container.trackedContainers?.[0]?.nroOrden ?? "-"}</td>
+                                            <td className="p-2 border text-black">{container.trackedContainers?.[0]?.detalle ?? "-"}</td>
                                             <td className="p-2 border text-black">{container.metadata.status}</td>
                                             <td className="p-2 border text-black">{container.metadata.updated_at}</td>
                                             <td className="p-2 border text-black">{info?.type || "-"}</td>
                                             <td className="p-2 border text-black">{info?.transport_type || "-"}</td>
-                                            <td className="p-2 border text-black">{info?.from?.name}, {info?.from?.state}</td>
-                                            <td className="p-2 border text-black">{info?.to?.name}, {info?.to?.state}, {info?.to?.country}</td>
+                                            <td className="p-2 border text-black">{container.trackedContainers?.[0]?.nombreEmpresa ?? "-"}</td>
+
                                         </tr>
                                     );
                                 })}

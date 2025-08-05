@@ -22,6 +22,13 @@ export interface RouteData {
     pin: Coordinates;
 }
 
+export interface TrackedContainers {
+    nroOrden: string | null;
+    state: string | null;
+    detalle: string | null;
+    nombreEmpresa: string | null;
+}
+
 export interface ContainerResponse {
     id: number;
     metadata: {
@@ -31,4 +38,5 @@ export interface ContainerResponse {
         updated_at: string;
     };
     route_data: RouteData;
+    trackedContainers?: TrackedContainers[] | null;
 }
