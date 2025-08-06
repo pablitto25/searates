@@ -11,7 +11,7 @@ export interface RouteLocation extends Coordinates {
 
 export interface RouteInfo {
     type: string;
-    transport_type: string;
+    transport_type: TransportType;
     from: RouteLocation;
     to: RouteLocation;
     pathObjects: Coordinates[];
@@ -40,3 +40,28 @@ export interface ContainerResponse {
     route_data: RouteData;
     trackedContainers?: TrackedContainers[] | null;
 }
+
+export type TransportType =
+    | 'VESSEL'       // Buque de carga
+    | 'BARGE'        // Barcaza
+    | 'FEEDER'       // Buque alimentador
+    | 'TRUCK'        // Camión
+    | 'TRAIN'        // Tren
+    | 'RAIL'         // Ferrocarril (alternativa a TRAIN)
+    | 'AIR'          // Transporte aéreo
+    | 'AIRCRAFT'     // Avión (alternativa a AIR)
+    | 'INTERMODAL'   // Transporte multimodal
+    | 'RO-RO'        // Roll-on/Roll-off (transbordador)
+    | 'LIGHTER'      // Barcaza de transferencia
+    | 'PIPELINE'     // Transporte por tuberías
+    | 'POST'         // Servicio postal
+    | 'WAREHOUSE'    // Almacén
+    | 'PORT'         // Operación portuaria
+    | 'ONFOOT'       // Transporte a pie (para distancias cortas)
+    | 'BULK'         // Carga a granel
+    | 'CONTAINER'    // Contenedor específico
+    | 'TANKER'       // Buque tanque
+    | 'REEFER'       // Contenedor refrigerado
+    | string;        // Para cualquier tipo no listado
+
+
