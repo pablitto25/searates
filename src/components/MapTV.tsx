@@ -115,6 +115,44 @@ function FitAllOnce({ pins }: { pins: LatLngTuple[] }) {
     return null;
 }
 
+// Mantiene [-180,180]
+function normalizeLon(lon: number): number {
+    while (lon > 180) lon -= 360;
+    while (lon < -180) lon += 360;
+    return lon;
+}
+
+// Devuelve la copia de `lon` (sumando k*360) más cercana a `ref`
+function toNearestCopy(lon: number, ref: number): number {
+    const k = Math.round((ref - lon) / 360);
+    return lon + 360 * k;
+}
+
+// Tu unwrap existente, sin cambios (o el que ya uses)
+function unwrapLongitudes(line: [number, number][]): [number, number][] {
+    if (!line || !line.length) return line;
+    const out: [number, number][] = [];
+    let offset = 0;
+    let prevLon = line[0][1];
+    for (let i = 0; i < line.length; i++) {
+        const [lat, lon] = line[i];
+        let adj = lon + offset;
+        const diff = adj - prevLon;
+        if (diff > 180) { offset -= 360; adj = lon + offset; }
+        else if (diff < -180) { offset += 360; adj = lon + offset; }
+        out.push([lat, adj]);
+        prevLon = adj;
+    }
+    return out;
+}
+
+// líneas por contenedor
+const getContainerLines = (c: ContainerResponse) =>
+    c.route_data?.route_info?.map((r) => {
+        const raw = r.pathObjects.map((p) => [p.lat, p.lng] as LatLngTuple);
+        return unwrapLongitudes(raw as [number, number][]) as LatLngTuple[];
+    }) ?? [];
+
 /* ---------- autoplay robusto por contador ---------- */
 type FocusPhase = "start" | "pin" | "end";
 
@@ -122,29 +160,30 @@ function useAutoplayFocusPhases(
     conts: ContainerResponse[],
     intervalMs = 8000
 ) {
-    const list = useMemo(
-        () =>
-            conts.map((c) => ({
-                id: c.id,
-                start: getStartCoord(c),
-                pin: c.route_data?.pin ? { lat: c.route_data.pin.lat, lng: c.route_data.pin.lng } : null,
-                end: getEndCoord(c),
-                ref: c,
-            })),
-        [conts]
-    );
+    // Construimos la lista en base a LÍNEAS UNWRAP
+    const list = useMemo(() => {
+        return conts.map((c) => {
+            const lines = getContainerLines(c);               // <-- unwrap aplicado
+            const all = lines.flat();
+            const start = all.length ? { lat: all[0][0], lng: all[0][1] } : null;
+            const end = all.length ? { lat: all[all.length - 1][0], lng: all[all.length - 1][1] } : null;
+
+            // Pin “tal cual”; si alguna vez lo ves despajado respecto de la línea,
+            // se puede ajustar copiando el offset del tramo más cercano.
+            const pin = c.route_data?.pin
+                ? { lat: c.route_data.pin.lat, lng: c.route_data.pin.lng }
+                : null;
+
+            return { id: c.id, start, pin, end, ref: c, lines };
+        });
+    }, [conts]);
 
     const [step, setStep] = useState(0);
 
-    useEffect(() => {
-        setStep(0);
-    }, [JSON.stringify(list.map(i => i.id))]);
-
+    useEffect(() => { setStep(0); }, [JSON.stringify(list.map(i => i.id))]);
     useEffect(() => {
         if (!list.length) return;
-        const t = setInterval(() => {
-            setStep((s) => s + 1);
-        }, intervalMs);
+        const t = setInterval(() => setStep(s => s + 1), intervalMs);
         return () => clearInterval(t);
     }, [list.length, intervalMs]);
 
@@ -255,7 +294,7 @@ export default function MapTV() {
     );
 
     // autoplay: id + fase + trio
-    const { focusId, phase, focusContainer, trio } = useAutoplayFocusPhases(data, 4000);
+    const { focusId, phase, focusContainer, trio } = useAutoplayFocusPhases(data, 8000);
 
     useEffect(() => {
         if (!focusId || !containerListRef.current) return;
@@ -274,11 +313,7 @@ export default function MapTV() {
     }, [focusId]);
 
 
-    // líneas por contenedor
-    const getContainerLines = (c: ContainerResponse) =>
-        c.route_data?.route_info?.map((r) =>
-            r.pathObjects.map((p) => [p.lat, p.lng] as LatLngTuple)
-        ) ?? [];
+
 
     // estilo con foco
     const withFocus = (cid: number, base: any) => {
@@ -353,6 +388,8 @@ export default function MapTV() {
     }, [lastRefresh]);
 
 
+
+
     return (
         <div className="fixed inset-0 flex flex-col" style={{ background: darkBg }}>
             {/* Header */}
@@ -395,44 +432,38 @@ export default function MapTV() {
                         <FitFocusBounds trio={trio ? { start: trio.start, pin: trio.pin, end: trio.end } : null} />
 
                         {data.map((c) => {
-                            // Solo renderizar si está en foco
                             if (focusId !== null && focusId !== c.id) return null;
 
-                            const lines = getContainerLines(c);
-                            const pin = c.route_data?.pin
-                                ? ([c.route_data.pin.lat, c.route_data.pin.lng] as LatLngTuple)
-                                : null;
-
-                            // Obtener todos los puntos de todas las líneas
+                            const lines = getContainerLines(c);           // << ya unwrapped
                             const allPoints = lines.flat();
                             if (allPoints.length < 2) return null;
 
-                            // Primer punto de todo el recorrido (inicio)
+                            // Referencia de longitudes de la ruta (promedio)
+                            const refLon = allPoints.reduce((acc, p) => acc + p[1], 0) / allPoints.length;
+
+                            // Ajustar el pin al mundo más cercano a la ruta
+                            let adjPin: LatLngTuple | null = null;
+                            if (c.route_data?.pin) {
+                                const p = c.route_data.pin;
+                                const adjLon = toNearestCopy(p.lng, refLon);
+                                adjPin = [p.lat, adjLon] as LatLngTuple;
+                            }
+
+                            // Inicio/fin del recorrido (ya unwrapped)
                             const firstPoint = allPoints[0];
-                            // Último punto de todo el recorrido (final)
                             const lastPoint = allPoints[allPoints.length - 1];
 
                             return (
                                 <div key={c.id}>
-                                    {/* Círculo rojo al inicio de todo el recorrido */}
+                                    {/* Inicio */}
                                     <CircleMarker
                                         center={firstPoint}
                                         radius={6}
-                                        pathOptions={{
-                                            color: '#ff0000',
-                                            fillColor: '#ff0000',
-                                            fillOpacity: 0.8,
-                                            weight: 2
-                                        }}
-                                        eventHandlers={{
-                                            add: (e) => {
-                                                // Esto asegura que el círculo esté encima de las líneas
-                                                e.target.bringToFront();
-                                            }
-                                        }}
+                                        pathOptions={{ color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.8, weight: 2 }}
+                                        eventHandlers={{ add: (e) => e.target.bringToFront() }}
                                     />
 
-                                    {/* Renderizar todas las líneas */}
+                                    {/* Líneas */}
                                     {lines.map((line, idx) => {
                                         if (line.length < 2) return null;
                                         const type = c.route_data?.route_info?.[idx]?.type;
@@ -444,49 +475,32 @@ export default function MapTV() {
                                                 positions={line}
                                                 pathOptions={base}
                                                 duration={800}
-                                                eventHandlers={{
-                                                    add: (e) => {
-                                                        // Esto asegura que la línea esté detrás de los círculos
-                                                        e.target.bringToBack();
-                                                    }
-                                                }}
+                                                eventHandlers={{ add: (e) => e.target.bringToBack() }}
                                             />
                                         ) : (
                                             <Polyline
                                                 key={`${c.id}-${idx}`}
                                                 positions={line}
                                                 pathOptions={base}
-                                                eventHandlers={{
-                                                    add: (e) => {
-                                                        e.target.bringToBack();
-                                                    }
-                                                }}
+                                                eventHandlers={{ add: (e) => e.target.bringToBack() }}
                                             />
                                         );
                                     })}
 
-                                    {/* Círculo verde al final de todo el recorrido */}
+                                    {/* Fin */}
                                     <CircleMarker
                                         center={lastPoint}
                                         radius={6}
-                                        pathOptions={{
-                                            color: '#00aa00',
-                                            fillColor: '#00aa00',
-                                            fillOpacity: 0.8,
-                                            weight: 2
-                                        }}
-                                        eventHandlers={{
-                                            add: (e) => {
-                                                e.target.bringToFront();
-                                            }
-                                        }}
+                                        pathOptions={{ color: '#00aa00', fillColor: '#00aa00', fillOpacity: 0.8, weight: 2 }}
+                                        eventHandlers={{ add: (e) => e.target.bringToFront() }}
                                     />
 
-                                    {pin && (
+                                    {/* Pin actual (ajustado al mismo mundo) */}
+                                    {adjPin && (
                                         <Marker
-                                            position={pin}
+                                            position={adjPin}
                                             icon={focusId === c.id ? focusedPin : defaultPin}
-                                            zIndexOffset={1000}  // Esto sí es válido para Marker
+                                            zIndexOffset={1000}
                                         />
                                     )}
                                 </div>

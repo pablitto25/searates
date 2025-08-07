@@ -99,6 +99,37 @@ export default function Map() {
         iconAnchor: [16, 32],
     });
 
+    // Evita saltos al cruzar el antimeridiano (±180°)
+    function unwrapLongitudes(line: LatLngTuple[]): LatLngTuple[] {
+        if (!line || line.length === 0) return line;
+        const out: LatLngTuple[] = [];
+        let offset = 0;
+        let prevLon = line[0][1]; // lng
+
+        for (let i = 0; i < line.length; i++) {
+            const lat = line[i][0];
+            let lon = line[i][1];
+
+            // Calculamos la diferencia considerando el offset actual
+            let adjusted = lon + offset;
+            let diff = adjusted - prevLon;
+
+            if (diff > 180) {
+                // veníamos por +x y el siguiente punto "saltó" hacia -x: corrigo restando 360
+                offset -= 360;
+                adjusted = lon + offset;
+            } else if (diff < -180) {
+                // veníamos por -x y el siguiente punto "saltó" hacia +x: corrigo sumando 360
+                offset += 360;
+                adjusted = lon + offset;
+            }
+
+            out.push([lat, adjusted]);
+            prevLon = adjusted;
+        }
+        return out;
+    }
+
     return (
         <div className="w-full h-[900px] flex flex-col gap-4">
             <div className="flex-grow">
@@ -112,8 +143,10 @@ export default function Map() {
                         attribution='</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {getPolylinesFromSelected().map((line, i) => {
-                        if (!line || line.length < 2) return null;
+                    {getPolylinesFromSelected().map((rawLine, i) => {
+                        if (!rawLine || rawLine.length < 2) return null;
+
+                        const line = unwrapLongitudes(rawLine); // <-- aquí
 
                         const start = line[0];
                         const end = line[line.length - 1];
@@ -121,16 +154,8 @@ export default function Map() {
                         return (
                             <React.Fragment key={`selected-${i}`}>
                                 <Polyline positions={line} pathOptions={{ color: "blue", weight: 2 }} />
-
-                                {/* Punto de inicio */}
-                                <Marker position={start} icon={startIcon}>
-                                    <Popup>Inicio de ruta 🏁</Popup>
-                                </Marker>
-
-                                {/* Punto de fin */}
-                                <Marker position={end} icon={endIcon}>
-                                    <Popup>Fin de ruta 🎯</Popup>
-                                </Marker>
+                                <Marker position={start} icon={startIcon} />
+                                <Marker position={end} icon={endIcon} />
                             </React.Fragment>
                         );
                     })}
