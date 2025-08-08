@@ -37,8 +37,24 @@ export interface ContainerResponse {
         status: string;
         updated_at: string;
     };
+    route: RouteStages;
     route_data: RouteData;
     trackedContainers?: TrackedContainers[] | null;
+}
+
+
+export interface RouteStages {
+    prepol: RoutePoint;
+    pol: RoutePoint;  // Puerto de origen real
+    pod: RoutePoint;  // Puerto de destino real
+    postpod: RoutePoint;
+}
+
+export interface RoutePoint {
+    date: string;                 // "2025-06-30 08:49:00"
+    actual: boolean;              // true / false
+    predictiveEta: string | null; // Puede ser null
+    resolvedlocation: string | null; // Puede ser null (si algún día viene con valor)
 }
 
 export type TransportType =

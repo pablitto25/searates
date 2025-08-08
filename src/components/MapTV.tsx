@@ -8,6 +8,9 @@ import { fetchAllContainers } from "@/types/containerService";
 import type { ContainerResponse } from "@/types/container";
 import { AnimatedPolyline } from "./AnimatedPolyline";
 import { Circle, CircleMarker } from 'react-leaflet';
+import EmojiIconMarker from '@/components/EmojiIconMarker'
+import { CountryFlag } from "@/utils/CountryFlags";
+import { LineStyleOptions } from "@/types/types";
 
 const darkBg = "#E6E6E6";
 
@@ -29,6 +32,7 @@ const focusedPin = new L.Icon({
     shadowUrl: "",
 });
 
+
 const getRouteColor = (index: number) => {
     const colors = [
         '#FF6B6B', // Rojo claro
@@ -44,34 +48,43 @@ const getRouteColor = (index: number) => {
 };
 
 /* ---------- estilos ---------- */
-function lineStyleByType(type?: string, index: number = 0) {
+function lineStyleByType(type?: string, index: number = 0, isLast: boolean = false): LineStyleOptions {
     const baseColor = getRouteColor(index);
+
+    const baseStyle: LineStyleOptions = {
+        color: baseColor,
+        weight: isLast ? 5 : 4, // Más grueso para el último tramo
+        opacity: 0.9
+    };
+
+    if (isLast) {
+        return {
+            ...baseStyle,
+            dashArray: "2, 6",  // Patrón más visible
+            lineCap: 'round',
+            lineJoin: 'round'
+        };
+    }
 
     switch (type) {
         case "SEA":
             return {
-                color: baseColor,
-                weight: 4,
-                opacity: 0.9,
-                dashArray: index % 2 === 0 ? undefined : "5, 5" // Alternar líneas sólidas/punteadas
+                ...baseStyle,
+                dashArray: index % 2 === 0 ? undefined : "5, 5"
             };
         case "LAND":
             return {
-                color: baseColor,
-                weight: 4,
-                dashArray: "8, 4",
-                opacity: 0.9
+                ...baseStyle,
+                dashArray: "8, 4"
             };
         case "AIR":
             return {
-                color: baseColor,
-                weight: 4,
-                dashArray: "2, 6",
-                opacity: 0.9
+                ...baseStyle,
+                dashArray: "2, 6"
             };
         default:
             return {
-                color: baseColor,
+                ...baseStyle,
                 weight: 3,
                 dashArray: "4, 8",
                 opacity: 0.7
@@ -79,28 +92,6 @@ function lineStyleByType(type?: string, index: number = 0) {
     }
 }
 
-/* ---------- helpers inicio/fin ---------- */
-function getStartCoord(c: ContainerResponse) {
-    const firstLeg = c.route_data?.route_info?.[0];
-    if (!firstLeg) return null;
-    const p0 = firstLeg.pathObjects?.[0];
-    if (p0) return { lat: p0.lat, lng: p0.lng };
-    if (firstLeg.from) return { lat: firstLeg.from.lat, lng: firstLeg.from.lng };
-    return null;
-}
-
-function getEndCoord(c: ContainerResponse) {
-    const legs = c.route_data?.route_info;
-    if (!legs || !legs.length) return null;
-    const lastLeg = legs[legs.length - 1];
-    const arr = lastLeg.pathObjects;
-    if (arr && arr.length) {
-        const last = arr[arr.length - 1];
-        return { lat: last.lat, lng: last.lng };
-    }
-    if (lastLeg.to) return { lat: lastLeg.to.lat, lng: lastLeg.to.lng };
-    return null;
-}
 
 /* ---------- fit inicial a todos los pins (una vez) ---------- */
 function FitAllOnce({ pins }: { pins: LatLngTuple[] }) {
@@ -295,6 +286,7 @@ export default function MapTV() {
 
     // autoplay: id + fase + trio
     const { focusId, phase, focusContainer, trio } = useAutoplayFocusPhases(data, 8000);
+    useProgressBar(24000, focusId, phase); // 24 segundos en total
 
     useEffect(() => {
         if (!focusId || !containerListRef.current) return;
@@ -312,14 +304,6 @@ export default function MapTV() {
         return () => clearTimeout(timer);
     }, [focusId]);
 
-
-
-
-    // estilo con foco
-    const withFocus = (cid: number, base: any) => {
-        const isFocused = focusId === null || focusId === cid;
-        return isFocused ? base : null;
-    };
 
     const getTransportDetails = (transportType: string) => {
         const details = {
@@ -388,6 +372,59 @@ export default function MapTV() {
     }, [lastRefresh]);
 
 
+    // Añade este hook en tu archivo
+    function useProgressBar(totalDuration: number, focusId: number | null, phase: FocusPhase) {
+        useEffect(() => {
+            if (!focusId) {
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) progressBar.style.width = '0%';
+                return;
+            }
+
+            let startTime: number;
+            let animationFrameId: number;
+            const segmentDuration = totalDuration / 3;
+
+            const animate = (timestamp: number) => {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                const currentPhaseProgress = (elapsed / segmentDuration) * 33.33;
+
+                let totalProgress = 0;
+                if (phase === "start") {
+                    totalProgress = currentPhaseProgress;
+                } else if (phase === "pin") {
+                    totalProgress = 33.33 + currentPhaseProgress;
+                } else {
+                    totalProgress = 66.66 + currentPhaseProgress;
+                }
+
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = `${totalProgress}%`;
+                    // Elimina cualquier modificación de clase que cambie el color
+                }
+
+                if (totalProgress < 100) {
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+            };
+
+            animationFrameId = requestAnimationFrame(animate);
+
+            return () => {
+                cancelAnimationFrame(animationFrameId);
+            };
+        }, [focusId, phase, totalDuration]);
+    }
+
+    const extractCountry = (empresa: string | undefined) => {
+        if (!empresa) return null;
+
+        // Expresión regular para encontrar el país entre paréntesis
+        const match = empresa.match(/\(([^)]+)\)/);
+        return match ? match[1].trim() : null;
+    };
 
 
     return (
@@ -467,13 +504,18 @@ export default function MapTV() {
                                     {lines.map((line, idx) => {
                                         if (line.length < 2) return null;
                                         const type = c.route_data?.route_info?.[idx]?.type;
-                                        const base = lineStyleByType(type, idx);
+                                        const isLast = idx === lines.length - 1;
+                                        const base = lineStyleByType(type, idx, isLast);
 
-                                        return focusId === c.id ? (
+                                        // Si es la última línea o está en foco, usa AnimatedPolyline
+                                        const shouldAnimate = isLast || focusId === c.id;
+
+                                        return shouldAnimate ? (
                                             <AnimatedPolyline
                                                 key={`${c.id}-${idx}`}
                                                 positions={line}
                                                 pathOptions={base}
+                                                isLastSegment={isLast}
                                                 duration={800}
                                                 eventHandlers={{ add: (e) => e.target.bringToBack() }}
                                             />
@@ -497,10 +539,10 @@ export default function MapTV() {
 
                                     {/* Pin actual (ajustado al mismo mundo) */}
                                     {adjPin && (
-                                        <Marker
-                                            position={adjPin}
-                                            icon={focusId === c.id ? focusedPin : defaultPin}
-                                            zIndexOffset={1000}
+                                        <EmojiIconMarker
+                                            container={c}
+                                            adjPin={adjPin}
+                                            focusId={focusId ?? undefined}
                                         />
                                     )}
                                 </div>
@@ -525,26 +567,52 @@ export default function MapTV() {
                             <div
                                 key={c.id}
                                 id={`container-${c.id}`}
-                                className={`text-black p-4 border-b border-gray-100 transition-colors duration-300 ${focusId === c.id
-                                    ? 'bg-blue-100 border-l-4 border-blue-500'
-                                    : 'hover:bg-gray-50'
-                                    }`}
+                                className={`
+                                        text-black p-5 my-2 mx-3 rounded-lg 
+                                        bg-white border border-gray-200
+                                        transition-all duration-300
+                                        hover:border-gray-300 hover:shadow-md
+                                        ${focusId === c.id
+                                        ? 'ring-2 ring-black border-blue-200 bg-blue-50'
+                                        : ''
+                                    }
+`}
                             >
-                                <div className="font-semibold">{c.metadata.number}</div>
-                                <div className="text-sm text-black">
+                                <div className="font-semibold">{c.metadata.number}
+                                </div>
+                                <div className="text-xs text-black">
                                     Orden: {c.trackedContainers?.[0]?.nroOrden || '-'}
                                 </div>
-                                <div className="text-xs text-black mt-1">
-                                    Empresa: {c.trackedContainers?.[0]?.nombreEmpresa}
+                                <div className="flex items-center text-sm text-black mt-1">
+                                    <div className="text-xs">
+                                        Empresa: {c.trackedContainers?.[0]?.nombreEmpresa}
+                                    </div>
+                                    <div className="pl-2">
+                                        {c.trackedContainers?.[0]?.nombreEmpresa && (
+                                            <div className="">
+                                                <CountryFlag
+                                                    empresa={c.trackedContainers?.[0].nombreEmpresa || "-"}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-
+                                <div className="text-xs text-black">
+                                    Detalle: {c.trackedContainers?.[0]?.detalle || "-"}
+                                </div>
                                 {/* Sección de rutas mejorada */}
                                 <div className="mt-2 text-xs space-y-2">
                                     {c.route_data?.route_info?.map((route, index) => {
                                         const transport = getTransportDetails(route.transport_type);
                                         return (
                                             <div key={index} className="grid grid-cols-2 gap-1">
-                                                <div className="flex items-center col-span-2">
+                                                <div
+                                                    className="flex items-center col-span-2"
+                                                    style={{
+                                                        borderLeft: `4px solid ${getRouteColor(index)}`,
+                                                        paddingLeft: '6px'
+                                                    }}
+                                                >
                                                     <span className="mr-2 text-base">{transport.icon}</span>
                                                     <div>
                                                         <span className="font-medium">{transport.label}</span>
@@ -560,9 +628,17 @@ export default function MapTV() {
                                                 {index < c.route_data.route_info.length - 1 && (
                                                     <div className="col-span-2 border-t border-gray-200 my-1"></div>
                                                 )}
+
                                             </div>
+
+
                                         );
                                     })}
+                                </div>
+                                <div className="text-xs pt-2 text-black">
+                                    Fecha de Llegada: {c.route.pod?.date
+                                        ? new Date(c.route.pod.date).toLocaleDateString("es-AR")
+                                        : ""}
                                 </div>
 
                                 {/* {focusId === c.id && (
@@ -570,10 +646,19 @@ export default function MapTV() {
                                         {phase === "start" ? "Mostrando: Inicio" : phase === "pin" ? "Mostrando: Posición actual" : "Mostrando: Destino"}
                                     </div>
                                 )} */}
+
                             </div>
                         ))}
                     </div>
                 </div>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 h-1 bg-gray-200 z-[9999]">
+                <div
+                    id="progress-bar"
+                    className="h-full bg-red-600 transition-all duration-100 ease-linear"
+                    style={{ width: '0%' }}
+                ></div>
             </div>
 
             {/* Panel de detalles del contenedor en foco */}
@@ -598,8 +683,12 @@ export default function MapTV() {
                             <div className="text-lg">{focusContainer.trackedContainers?.[0]?.detalle || "-"}</div>
                         </div>
                         <div>
-                            <div className="text-xs text-black uppercase font-medium">Fecha de llegada:</div>
-                            <div className="text-lg font-semibold">{/* {focusContainer.metadata.status} */} null </div>
+                            <div className="text-xs text-black uppercase font-medium">Fecha de llegada: </div>
+                            <div className="text-lg font-semibold">
+                                {focusContainer.route.pod?.date
+                                    ? new Date(focusContainer.route.pod.date).toLocaleDateString("es-AR")
+                                    : ""}
+                            </div>
                         </div>
                     </div>
                 </div>

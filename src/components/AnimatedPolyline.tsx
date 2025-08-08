@@ -1,22 +1,43 @@
 import { useEffect, useRef } from "react";
 import { Polyline, PolylineProps } from "react-leaflet";
 import L from "leaflet";
+import { LineStyleOptions } from '@/types/types';
+
+interface AnimatedPolylineProps extends PolylineProps {
+    duration?: number;
+    pathOptions: LineStyleOptions; // Usa el tipo importado
+    isLastSegment?: boolean;
+}
 
 export const AnimatedPolyline = ({
     positions,
     duration = 1500,
+    isLastSegment = false,
     ...props
-}: PolylineProps & { duration?: number }) => {
+}: AnimatedPolylineProps) => {
     const polylineRef = useRef<L.Polyline>(null);
 
     useEffect(() => {
         const polyline = polylineRef.current;
         if (!polyline) return;
 
-        // Inicialmente ocultamos la línea
-        polyline.setStyle({ opacity: 0, weight: 0 });
+        // Guardamos TODOS los estilos originales
+        const originalStyles = {
+            color: props.pathOptions.color, // Obligatorio (según tu interfaz)
+            weight: props.pathOptions.weight, // Obligatorio
+            opacity: props.pathOptions.opacity, // Obligatorio
+            dashArray: props.pathOptions.dashArray || "none", // Opcional, con valor por defecto
+            lineCap: props.pathOptions.lineCap || "round", // Opcional, con valor por defecto
+            lineJoin: props.pathOptions.lineJoin || "round", // Opcional, con valor por defecto
+        };
 
-        // Animación
+        // Inicialmente ocultamos la línea pero mantenemos el dashArray
+        polyline.setStyle({
+            opacity: 0,
+            weight: 0,
+            dashArray: isLastSegment ? originalStyles.dashArray : undefined
+        });
+
         let start: number | null = null;
         let animationFrameId: number;
 
@@ -32,15 +53,23 @@ export const AnimatedPolyline = ({
             const drawToLength = totalLength * progress;
             const opacity = progress < 0.1 ? progress * 10 : 1;
 
-            // Aplicar el estilo
-            polyline.setStyle({
+            // Aplicar estilo durante animación
+            const currentStyle = {
                 opacity: opacity,
-                weight: props.pathOptions?.weight || 3
-            });
+                weight: originalStyles.weight,
+                color: originalStyles.color
+            };
 
-            // Redibujar solo la parte visible
+            // Para el último segmento, mantener el dashArray durante toda la animación
+
+
+            polyline.setStyle(currentStyle);
+
+            // Configurar animación de trazado
             path.style.strokeDashoffset = `${totalLength - drawToLength}`;
-            path.style.strokeDasharray = `${totalLength} ${totalLength}`;
+            path.style.strokeDasharray = isLastSegment
+                ? originalStyles.dashArray
+                : `${totalLength} ${totalLength}`;
 
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame(animate);
@@ -51,15 +80,11 @@ export const AnimatedPolyline = ({
 
         return () => {
             cancelAnimationFrame(animationFrameId);
-            // Restablecer estilo al desmontar
             if (polyline) {
-                polyline.setStyle({
-                    opacity: 1,
-                    weight: props.pathOptions?.weight || 3
-                });
+                polyline.setStyle(originalStyles);
             }
         };
-    }, [positions, duration, props.pathOptions?.weight]);
+    }, [positions, duration, props.pathOptions, isLastSegment]);
 
     return <Polyline ref={polylineRef} positions={positions} {...props} />;
 };
