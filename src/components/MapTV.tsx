@@ -426,6 +426,18 @@ export default function MapTV() {
         return match ? match[1].trim() : null;
     };
 
+    // Dentro de tu componente MapTV, añade este useEffect
+    useEffect(() => {
+        // Configurar el intervalo de 1 hora (3600000 milisegundos)
+        const refreshInterval = setInterval(() => {
+            console.log('🔄 Recargando página para actualización horaria...');
+            window.location.reload();
+        }, 60 * 60 * 1000); // 60 minutos * 60 segundos * 1000 milisegundos
+
+        // Limpiar el intervalo al desmontar el componente
+        return () => clearInterval(refreshInterval);
+    }, []);
+
 
     return (
         <div className="fixed inset-0 flex flex-col" style={{ background: darkBg }}>
@@ -439,7 +451,6 @@ export default function MapTV() {
                     {lastRefresh ? (
                         <>
                             <div>Actualizado: {lastRefresh.toLocaleTimeString()}</div>
-                            <div>Próxima actualización: {nextRefreshTime}</div>
                         </>
                     ) : (
                         "Cargando..."
