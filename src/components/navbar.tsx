@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 export default function Navbar() {
 
-    const [imgHomeSrc, setImgHomeSrc] = useState('/assets/navbar/homeg.svg');
+    const [imgHomeSrc, setImgHomeSrc] = useState('/assets/navbar/Homeg.svg');
     const [imgMapSrc, setMapImgSrc] = useState('/assets/navbar/Map.svg');
 
     const pathname = usePathname();
@@ -26,7 +26,7 @@ export default function Navbar() {
             <div>
                 <ul className='flex items-center gap-6'>
                     <li>
-                        <Link href={'http://localhost:3000'}>
+                        <Link href={'/home'}>
                             <Image className='rounded-full'
                                 src="/assets/navbar/logo-left-nav.svg"
                                 width={90}
