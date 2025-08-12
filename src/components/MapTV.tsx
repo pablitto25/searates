@@ -485,7 +485,7 @@ export default function MapTV() {
                     <img src="/assets/logo-tv.png" alt="logo" className="h-8" />
                     <div className="text-xl font-semibold">Container Tracking</div>
                 </div>
-                <div className="text-sm opacity-80">
+                {/* <div className="text-sm opacity-80">
                     {lastRefresh ? (
                         <>
                             <div>Actualizado: {lastRefresh.toLocaleTimeString()}</div>
@@ -493,7 +493,7 @@ export default function MapTV() {
                     ) : (
                         "Cargando..."
                     )}
-                </div>
+                </div> */}
             </div>
 
             {/* Contenido principal */}
