@@ -1,3 +1,4 @@
+import { ContainerResponse } from '@/types/container';
 import fs from 'fs';
 import path from 'path';
 
@@ -27,44 +28,33 @@ function logTimeRemaining() {
 
 export async function updateContainersData(): Promise<{ success: boolean, error?: string }> {
     try {
-        console.log('⏳ Iniciando actualización de datos de contenedores...');
-        const startTime = Date.now();
+        const response = await fetch('/api/update-containers', {
+            method: 'POST'
+        });
 
-        const res = await fetch("http://54.82.251.60:8080/DataEntity");
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-
-        const data = await res.json();
-
-        // Validar que los datos no estén vacíos
-        if (!data || (Array.isArray(data) && data.length === 0)) {
-            throw new Error('Datos recibidos están vacíos');
+        if (!response.ok) {
+            throw new Error('Failed to update containers');
         }
 
-        // Crear directorio si no existe
-        if (!fs.existsSync(DATA_DIR)) {
-            fs.mkdirSync(DATA_DIR, { recursive: true });
-        }
-
-        // Escribir archivo temporal primero
-        const tempFile = DATA_FILE + '.tmp';
-        fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
-
-        // Reemplazar archivo original solo si la escritura fue exitosa
-        fs.renameSync(tempFile, DATA_FILE);
-
-        const duration = (Date.now() - startTime) / 1000;
-        lastUpdateTime = Date.now(); // Actualizar el tiempo de la última actualización
-
-        console.log(`✅ Datos actualizados en ${duration.toFixed(2)}s. Guardados en: ${DATA_FILE}`);
-
-        // Programar el próximo log de tiempo restante
-        setTimeout(logTimeRemaining, 10 * 60 * 1000); // 10 minutos
-
-        return { success: true };
+        return await response.json();
     } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-        console.error('❌ Error al actualizar datos:', errorMsg);
-        return { success: false, error: errorMsg };
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+
+export async function readContainersData(): Promise<ContainerResponse[]> {
+    try {
+        const response = await fetch('/api/update-containers');
+        if (!response.ok) {
+            throw new Error('Failed to read containers');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error reading containers:', error);
+        return [];
     }
 }
 

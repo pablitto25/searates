@@ -11,6 +11,7 @@ import { Circle, CircleMarker } from 'react-leaflet';
 import EmojiIconMarker from '@/components/EmojiIconMarker'
 import { CountryFlag } from "@/utils/CountryFlags";
 import { LineStyleOptions } from "@/types/types";
+import { updateContainersData } from "@/lib/updateContainers";
 
 const darkBg = "#E6E6E6";
 
@@ -426,15 +427,37 @@ export default function MapTV() {
         return match ? match[1].trim() : null;
     };
 
-    // Dentro de tu componente MapTV, añade este useEffect
     useEffect(() => {
-        // Configurar el intervalo de 1 hora (3600000 milisegundos)
-        const refreshInterval = setInterval(() => {
-            console.log('🔄 Recargando página para actualización horaria...');
-            window.location.reload();
-        }, 60 * 60 * 1000); // 60 minutos * 60 segundos * 1000 milisegundos
+        // Función combinada que actualiza tanto el estado como el archivo
+        const refreshData = async () => {
+            console.log('🔄 Iniciando actualización completa...');
+            try {
+                // 1. Actualizar el archivo containers.json
+                const fileUpdateResult = await updateContainersData();
 
-        // Limpiar el intervalo al desmontar el componente
+                if (!fileUpdateResult.success) {
+                    throw new Error(fileUpdateResult.error || 'Error al actualizar archivo');
+                }
+
+                // 2. Actualizar el estado del componente
+                const all = await fetchAllContainers();
+                const sorted = [...all].sort((a, b) => a.id - b.id);
+                setData(sorted);
+                localStorage.setItem("all_containers", JSON.stringify(sorted));
+                setLastRefresh(new Date());
+
+                console.log('✅ Datos y archivo actualizados correctamente');
+            } catch (error) {
+                console.error('❌ Error en la actualización:', error);
+            }
+        };
+
+        // Configurar intervalo (60 * 60 * 1000 = 1 hora)
+        const refreshInterval = setInterval(refreshData, 60 * 3000);
+
+        // Ejecutar inmediatamente al montar
+        refreshData();
+
         return () => clearInterval(refreshInterval);
     }, []);
 
