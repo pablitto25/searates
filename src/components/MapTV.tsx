@@ -428,37 +428,52 @@ export default function MapTV() {
     };
 
     useEffect(() => {
-        // Función combinada que actualiza tanto el estado como el archivo
-        const refreshData = async () => {
-            console.log('🔄 Iniciando actualización completa...');
-            try {
-                // 1. Actualizar el archivo containers.json
-                const fileUpdateResult = await updateContainersData();
+        let isMounted = true;
 
-                if (!fileUpdateResult.success) {
-                    throw new Error(fileUpdateResult.error || 'Error al actualizar archivo');
+        const refreshData = async () => {
+            try {
+                console.log('Iniciando actualización...');
+
+                // 1. Actualizar el archivo primero
+                const updateResult = await updateContainersData();
+                if (!updateResult.success) {
+                    throw new Error(updateResult.error || 'Error al actualizar archivo');
                 }
 
-                // 2. Actualizar el estado del componente
-                const all = await fetchAllContainers();
-                const sorted = [...all].sort((a, b) => a.id - b.id);
-                setData(sorted);
-                localStorage.setItem("all_containers", JSON.stringify(sorted));
-                setLastRefresh(new Date());
+                // 2. Obtener datos frescos
+                const freshData = await fetchAllContainers();
+                const sortedData = [...freshData].sort((a, b) => a.id - b.id);
 
-                console.log('✅ Datos y archivo actualizados correctamente');
+                // 3. Actualizar estado solo si el componente está montado
+                if (isMounted) {
+                    setData(sortedData);
+                    localStorage.setItem("all_containers", JSON.stringify(sortedData));
+                    setLastRefresh(new Date());
+                    console.log('Actualización completada:', new Date().toLocaleTimeString());
+                }
             } catch (error) {
-                console.error('❌ Error en la actualización:', error);
+                console.error('Error en actualización:', error);
+
+                // Intentar usar datos cacheados como fallback
+                if (isMounted) {
+                    const cachedData = localStorage.getItem("all_containers");
+                    if (cachedData) {
+                        setData(JSON.parse(cachedData));
+                    }
+                }
             }
         };
 
-        // Configurar intervalo (60 * 60 * 1000 = 1 hora)
-        const refreshInterval = setInterval(refreshData, 60 * 3000);
+        // Configurar intervalo (1 hora = 60 * 60 * 1000 ms)
+        const interval = setInterval(refreshData, 60 * 60 * 1000);
 
-        // Ejecutar inmediatamente al montar
+        // Ejecutar inmediatamente
         refreshData();
 
-        return () => clearInterval(refreshInterval);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, []);
 
 

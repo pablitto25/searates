@@ -13,8 +13,20 @@ export async function fetchContainer(containerNumber: string): Promise<Container
 }
 
 export async function fetchAllContainers(): Promise<ContainerResponse[]> {
-  const res = await fetch("/api/containers");
-  if (!res.ok) throw new Error("Failed to fetch container list");
-  const data: ContainerResponse[] = await res.json();
-  return data;
+  try {
+    const res = await fetch('/api/containers', {
+      cache: 'no-store', // Evitar caché
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return await res.json();
+  } catch (error) {
+    console.error("Error fetching containers:", error);
+    throw error;
+  }
 }
