@@ -24,9 +24,10 @@ const countryCodes: Record<string, string> = {
 
 interface CountryFlagProps {
     empresa: string | undefined;
+    size?: string;
 }
 
-export const CountryFlag = ({ empresa }: CountryFlagProps) => {
+export const CountryFlag = ({ empresa, size = "2em" }: CountryFlagProps) => {
     if (!empresa) return null;
 
     const country = extractCountry(empresa);
@@ -45,8 +46,8 @@ export const CountryFlag = ({ empresa }: CountryFlagProps) => {
             countryCode={countryCode}
             svg
             style={{
-                width: '2em',
-                height: '2em',
+                width: size,
+                height: size,
             }}
             title={country}
         />

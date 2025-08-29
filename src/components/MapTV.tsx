@@ -61,7 +61,7 @@ function lineStyleByType(type?: string, index: number = 0, isLast: boolean = fal
     if (isLast) {
         return {
             ...baseStyle,
-            dashArray: "2, 6",  // Patrón más visible
+            dashArray: "3, 8",  // Patrón más visible
             lineCap: 'round',
             lineJoin: 'round'
         };
@@ -221,21 +221,37 @@ function FitFocusBounds({
     return null;
 }
 
+const priorityCountries = ["ARGENTINA", "URUGUAY", "CHILE", "COLOMBIA"];
+const extractCountry = (empresa?: string | null): string | undefined => {
+    if (!empresa) return undefined;
+    const match = empresa.match(/\(([^)]+)\)/);
+    return match ? match[1].trim().toUpperCase() : undefined; // Convertir a mayúsculas
+};
+function sortByCountryPriority(containers: ContainerResponse[]) {
+    return [...containers].sort((a, b) => {
+        const countryA = extractCountry(a.trackedContainers?.[0]?.nombreEmpresa) || "";
+        const countryB = extractCountry(b.trackedContainers?.[0]?.nombreEmpresa) || "";
+        const indexA = priorityCountries.indexOf(countryA);
+        const indexB = priorityCountries.indexOf(countryB);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return 0; // Mantener orden relativo para países no listados
+    });
+}
+
 export default function MapTV() {
     const [data, setData] = useState<ContainerResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const containerListRef = useRef<HTMLDivElement>(null);
-
-
-
-    // Cache + refresh
     useEffect(() => {
         const cached = localStorage.getItem("all_containers");
         if (cached) {
             try {
                 const parsed: ContainerResponse[] = JSON.parse(cached);
-                setData(parsed.sort((a, b) => a.id - b.id));
+                // Ordenar según prioridad al cargar caché
+                setData(sortByCountryPriority(parsed));
                 setLoading(false);
             } catch { }
         }
@@ -261,10 +277,13 @@ export default function MapTV() {
         return () => clearTimeout(timer);
     }, []);
 
+
+
     async function refresh() {
         try {
             const all = await fetchAllContainers();
-            const sorted = [...all].sort((a, b) => a.id - b.id);
+            // Ordenar según prioridad antes de setear estado
+            const sorted = sortByCountryPriority(all);
             setData(sorted);
             localStorage.setItem("all_containers", JSON.stringify(sorted));
             setLastRefresh(new Date());
@@ -440,9 +459,9 @@ export default function MapTV() {
                     throw new Error(updateResult.error || 'Error al actualizar archivo');
                 }
 
-                // 2. Obtener datos frescos
+                // 2. Obtener datos frescos y ordenar por prioridad de país
                 const freshData = await fetchAllContainers();
-                const sortedData = [...freshData].sort((a, b) => a.id - b.id);
+                const sortedData = sortByCountryPriority(freshData);
 
                 // 3. Actualizar estado solo si el componente está montado
                 if (isMounted) {
@@ -477,13 +496,14 @@ export default function MapTV() {
     }, []);
 
 
+
     return (
         <div className="fixed inset-0 flex flex-col" style={{ background: darkBg }}>
             {/* Header */}
             <div className="w-full flex items-center justify-between px-6 py-3 text-black/90 bg-[#E6E6E6] backdrop-blur-sm z-50 shadow-xl/20">
                 <div className="flex items-center gap-3">
                     <img src="/assets/logo-tv.png" alt="logo" className="h-8" />
-                    <div className="text-xl font-semibold">Container Tracking</div>
+                    <div className="text-xl font-semibold">Seguimiento de Ordenes</div>
                 </div>
                 {/* <div className="text-sm opacity-80">
                     {lastRefresh ? (
@@ -498,6 +518,18 @@ export default function MapTV() {
 
             {/* Contenido principal */}
             <div className="flex flex-1 overflow-hidden">
+
+
+                {focusContainer && (
+                    <div className="absolute top-20 left-8 z-[1000] bg-white/80 p-2 rounded-lg shadow-md flex items-center gap-2">
+                        <CountryFlag
+                            empresa={focusContainer.trackedContainers?.[0]?.nombreEmpresa || "-"}
+                            size="4em"
+                        />
+                    </div>
+                )}
+
+
                 {/* Mapa */}
                 <div className="flex-1 relative">
                     <MapContainer
@@ -627,10 +659,10 @@ export default function MapTV() {
                                     }
 `}
                             >
-                                <div className="font-semibold">{c.metadata.number}
+                                <div className="font-semibold">Nro. Orden: {c.trackedContainers?.[0]?.nroOrden || '-'}
                                 </div>
                                 <div className="text-xs text-black">
-                                    Orden: {c.trackedContainers?.[0]?.nroOrden || '-'}
+                                    Nro. Contenedor: {c.metadata.number}
                                 </div>
                                 <div className="flex items-center text-sm text-black mt-1">
                                     <div className="text-xs">
@@ -669,10 +701,10 @@ export default function MapTV() {
                                                     </div>
                                                 </div>
                                                 <div className="col-span-2 text-gray-600">
-                                                    <span className="font-medium">Desde:</span> {route.from.name}, {route.from.state}, {route.from.country}
+                                                    <span className="font-medium">Desde:</span> {route.from.name}, {route.from.country}
                                                 </div>
                                                 <div className="col-span-2 text-gray-600">
-                                                    <span className="font-medium">Hacia:</span> {route.to.name}, {route.to.state}, {route.to.country}
+                                                    <span className="font-medium">Hacia:</span> {route.to.name}, {route.to.country}
                                                 </div>
                                                 {index < c.route_data.route_info.length - 1 && (
                                                     <div className="col-span-2 border-t border-gray-200 my-1"></div>
