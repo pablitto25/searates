@@ -549,9 +549,7 @@ export default function MapTV() {
                         <FitAllOnce pins={pins} />
                         <FitFocusBounds trio={trio ? { start: trio.start, pin: trio.pin, end: trio.end } : null} />
 
-                        {data.map((c) => {
-                            if (focusId !== null && focusId !== c.id) return null;
-
+                        {data.filter(c => focusId === null || focusId === c.id).map((c, index) => {
                             const lines = getContainerLines(c);           // << ya unwrapped
                             const allPoints = lines.flat();
                             if (allPoints.length < 2) return null;
@@ -572,7 +570,7 @@ export default function MapTV() {
                             const lastPoint = allPoints[allPoints.length - 1];
 
                             return (
-                                <div key={c.id}>
+                                <div key={index}>
                                     {/* Inicio */}
                                     <CircleMarker
                                         center={firstPoint}
@@ -593,7 +591,7 @@ export default function MapTV() {
 
                                         return shouldAnimate ? (
                                             <AnimatedPolyline
-                                                key={`${c.id}-${idx}`}
+                                                key={`${index}-${idx}`}
                                                 positions={line}
                                                 pathOptions={base}
                                                 isLastSegment={isLast}
@@ -602,7 +600,7 @@ export default function MapTV() {
                                             />
                                         ) : (
                                             <Polyline
-                                                key={`${c.id}-${idx}`}
+                                                key={`${index}-${idx}`}
                                                 positions={line}
                                                 pathOptions={base}
                                                 eventHandlers={{ add: (e) => e.target.bringToBack() }}
