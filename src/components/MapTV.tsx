@@ -503,7 +503,7 @@ export default function MapTV() {
             <div className="w-full flex items-center justify-between px-6 py-3 text-black/90 bg-[#E6E6E6] backdrop-blur-sm z-50 shadow-xl/20">
                 <div className="flex items-center gap-3">
                     <img src="/assets/logo-tv.png" alt="logo" className="h-8" />
-                    <div className="text-xl font-semibold">Seguimiento de Ordenes - ⚠️ Alerta de Tifon</div>
+                    <div className="text-xl font-semibold"></div>
                 </div>
                 {/* <div className="text-sm opacity-80">
                     {lastRefresh ? (
