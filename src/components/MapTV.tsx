@@ -715,7 +715,7 @@ export default function MapTV() {
                                     })}
                                 </div>
                                 <div className="text-xs pt-2 text-black">
-                                    Fecha de Llegada: {c.route.pod?.date
+                                    Arribo a puerto: {c.route.pod?.date
                                         ? new Date(c.route.pod.date).toLocaleDateString("es-AR")
                                         : ""}
                                 </div>
@@ -762,7 +762,7 @@ export default function MapTV() {
                             <div className="text-lg">{focusContainer.trackedContainers?.[0]?.detalle || "-"}</div>
                         </div>
                         <div>
-                            <div className="text-xs text-black uppercase font-medium">Fecha de llegada: </div>
+                            <div className="text-xs text-black uppercase font-medium">Arribo a puerto: </div>
                             <div className="text-lg font-semibold">
                                 {focusContainer.route.pod?.date
                                     ? new Date(focusContainer.route.pod.date).toLocaleDateString("es-AR")
